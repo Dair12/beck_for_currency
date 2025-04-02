@@ -51,6 +51,18 @@ def verify_email(request):
 
     return JsonResponse({'message': 'Registration successful. Welcome, ' + new_user.user})
 
+def send_email(user,password,email):
+    token = str(uuid.uuid4())
+    pending_users[token] = {'user': user, 'password': password, 'email': email}
+
+    verify_url = f"https://dair12.pythonanywhere.com/verify_email?token={token}"
+    send_mail(
+        'Confirm your registration',
+        f'Hi {user},\n\nClick the link to finish registration:\n{verify_url}',
+        settings.DEFAULT_FROM_EMAIL,
+        [email],
+        fail_silently=False,
+    )
 
 #Transactions___________________________________________________________________
 
@@ -276,17 +288,7 @@ def add_user(request):
             if not is_email_real(email):
                 return JsonResponse({'error': 'Provided email address does not appear to be real.'}, status=400)
 
-            token = str(uuid.uuid4())
-            pending_users[token] = {'user': user, 'password': password, 'email': email}
-
-            verify_url = f"https://dair12.pythonanywhere.com/verify_email?token={token}"
-            send_mail(
-                'Confirm your registration',
-                f'Hi {user},\n\nClick the link to finish registration:\n{verify_url}',
-                settings.DEFAULT_FROM_EMAIL,
-                [email],
-                fail_silently=False,
-            )
+            send_email(user,password,email)
 
             return JsonResponse({'message': 'Confirmation email sent. Please verify to complete registration.'})
 
@@ -294,35 +296,6 @@ def add_user(request):
             return JsonResponse({'error': str(e)}, status=500)
 
     return JsonResponse({'error': 'Invalid HTTP method.'}, status=405)
-
-# @csrf_exempt
-# def add_user(request):
-#     if request.method == 'POST':
-#         try:
-#             data = json.loads(request.body)
-#             user = data.get('user')
-#             password = data.get('password')
-#             email = data.get('email')
-
-#             if not user or not password or not email:
-#                 return JsonResponse({'error': 'User, password, and email fields are required.'}, status=400)
-
-#             if Users.objects.filter(user=user).exists():
-#                 return JsonResponse({'error': 'User already exists.'}, status=400)
-
-#             if Users.objects.filter(email=email).exists():
-#                 return JsonResponse({'error': 'Email already registered.'}, status=400)
-
-#             if not is_email_real(email):
-#                 return JsonResponse({'error': 'Provided email address does not appear to be real.'}, status=400)
-
-#             new_user = Users(user=user, password=password, email=email)
-#             new_user.save()
-#             return JsonResponse({'message': 'User added successfully.', 'user': new_user.user, 'email': new_user.email})
-
-#         except json.JSONDecodeError:
-#             return JsonResponse({'error': 'Invalid JSON input.'}, status=400)
-#     return JsonResponse({'error': 'Invalid HTTP method.'}, status=405)
 
 
 @csrf_exempt
