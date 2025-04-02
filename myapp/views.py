@@ -6,12 +6,14 @@ from .models import Currency
 from .models import Users
 from .models import Inventory
 from django.shortcuts import get_object_or_404
+from django.db import models
 import json
 import smtplib
 import dns.resolver
 import socket
 
 #efvfewdvdfvd
+# sdkv fdkvsd jfvs
 
 #Not reqest
 def is_email_real(email):
@@ -284,70 +286,56 @@ def delete_user(request):
             return JsonResponse({'error': 'Invalid JSON input.'}, status=400)
     return JsonResponse({'error': 'Invalid HTTP method.'}, status=405)
 
-# def get_all_users(request):
-#     currencies = Users.objects.values_list('user', flat=True)
-#     return JsonResponse(list(currencies), safe=False)
-
 @csrf_exempt
 def login_user(request):
     if request.method == 'POST':
-        data = json.loads(request.body)
-        username = data.get('username')
         try:
-            user = get_object_or_404(Users, user=username)
-            #user = Users.objects.get(user=username)
-            user.is_online = True
-            user.save()
-            return JsonResponse({'message': f'User {username} is now online.'}, status=200)
-        except Users.DoesNotExist:
-            return JsonResponse({'error': 'User not found'}, status=404)
+            data = json.loads(request.body)
+            identifier = data.get('identifier')  # username или email
+            password = data.get('password')
 
+            if not identifier or not password:
+                return JsonResponse({'error': 'Identifier and password are required.'}, status=400)
+
+            # Поиск по нику или email
+            user = Users.objects.filter(models.Q(user=identifier) | models.Q(email=identifier)).first()
+
+            if not user:
+                return JsonResponse({'error': 'User not found.'}, status=404)
+
+            if user.password != password:
+                return JsonResponse({'error': 'Invalid password.'}, status=401)
+
+            return JsonResponse({'message': f'Welcome back, {user.user}!', 'user': user.user, 'email': user.email, 'balance': user.balance}, status=200)
+
+        except json.JSONDecodeError:
+            return JsonResponse({'error': 'Invalid JSON input.'}, status=400)
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=500)
+    return JsonResponse({'error': 'Invalid request method.'}, status=405)
 
 @csrf_exempt
-def logout_user(request):
-    if request.method == 'POST':
-        data = json.loads(request.body)
-        username = data.get('username')
-        try:
-            user = get_object_or_404(Users, user=username)
-            #user = Users.objects.get(user=username)
-            user.is_online = False
-            user.save()
-            return JsonResponse({'message': f'User {username} is now offline.'}, status=200)
-        except Users.DoesNotExist:
-            return JsonResponse({'error': 'User not found'}, status=404)
+def get_all_users(request):
+    if request.method == 'GET':
+        users = Users.objects.all()
+        user_list = [
+            {
+                'user': user.user,
+                'email': user.email,
+                'balance': user.balance
+            }
+            for user in users
+        ]
+        return JsonResponse(user_list, safe=False)
+    return JsonResponse({'error': 'Invalid request method'}, status=405)
 
 # @csrf_exempt
 # def get_all_users(request):
 #     if request.method == 'GET':
 #         users = Users.objects.all()
-#         user_list = [{'username': user.username, 'is_online': user.is_online} for user in users]
+#         user_list = [{'user': user.user} for user in users]
 #         return JsonResponse(user_list, safe=False)
-@csrf_exempt
-def get_all_users(request):
-    if request.method == 'GET':
-        users = Users.objects.all()
-        user_list = [{'user': user.user, 'is_online': user.is_online} for user in users]
-        return JsonResponse(user_list, safe=False)
-    return JsonResponse({'error': 'Invalid request method'}, status=405)
-
-
-@csrf_exempt
-def get_password_by_username(request):
-    if request.method == 'POST':
-        try:
-            data = json.loads(request.body)
-            user = data.get('user')
-
-            if not user:
-                return JsonResponse({'error': 'User field is required.'}, status=400)
-
-            user_instance = get_object_or_404(Users, user=user)
-            return JsonResponse({'user': user_instance.user, 'password': user_instance.password,'balance': user_instance.balance})
-
-        except json.JSONDecodeError:
-            return JsonResponse({'error': 'Invalid JSON input.'}, status=400)
-    return JsonResponse({'error': 'Invalid HTTP method.'}, status=405)
+#     return JsonResponse({'error': 'Invalid request method'}, status=405)
 
 @csrf_exempt
 def get_user_inventory(request):

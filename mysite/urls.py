@@ -43,7 +43,6 @@ urlpatterns = [
     path('delete_user/', views.delete_user, name='delete_user'),
     #https://dair12.pythonanywhere.com/get_all_users/
     path('get_all_users/', views.get_all_users, name='get_all_users'),
-    path('get_password_by_username/', views.get_password_by_username, name='get_password_by_username'),
 
     path('clear_transactions/', views.clear_user_transactions, name='clear_user_transactions'),
 
@@ -54,6 +53,5 @@ urlpatterns = [
     path('reset_user_data/', views.reset_user_data, name='reset_user_data'),
 
     path('login_user/', views.login_user, name='login_user'),
-    path('logout_user/', views.logout_user, name='logout_user'),
 
 ]

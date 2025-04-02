@@ -14,7 +14,7 @@ from django.core.wsgi import get_wsgi_application
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'mysite.settings')
 
 application = get_wsgi_application()
-
+print("dskmjcmwdsdcmj")
 import subprocess
 
 sync_script = '/home/Dair12/sync.sh'
@@ -22,3 +22,4 @@ sync_script = '/home/Dair12/sync.sh'
 # Проверим, существует ли файл, и выполним его
 if os.path.exists(sync_script):
     subprocess.call([sync_script])
+    print("dskmjcmwdsdcmj")

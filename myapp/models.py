@@ -29,7 +29,7 @@ class Currency(models.Model):
 class Users(models.Model):
     user = models.CharField(max_length=10)
     password=models.CharField(max_length=10)
-    email = models.EmailField(unique=True, null=True, blank=True)
+    email = models.EmailField(unique=False, null=True, blank=True)
     balance = models.FloatField(default=0.0)
     def __str__(self):
         return f"{self.user} {self.password}"
