@@ -18,6 +18,7 @@ application = get_wsgi_application()
 import subprocess
 
 sync_script = '/home/Dair12/sync.sh'
+print(">>> WSGI файл загружен!")
 
 # Проверим, существует ли файл, и выполним его
 if os.path.exists(sync_script):
