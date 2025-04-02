@@ -27,9 +27,9 @@ class Currency(models.Model):
         return self.name
 
 class Users(models.Model):
-    user = models.CharField(max_length=10)
+    user = models.CharField(unique=True,max_length=10)
     password=models.CharField(max_length=10)
-    email = models.EmailField(unique=False, null=True, blank=True)
+    email = models.EmailField(unique=True)
     balance = models.FloatField(default=0.0)
     def __str__(self):
         return f"{self.user} {self.password}"

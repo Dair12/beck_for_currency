@@ -40,6 +40,7 @@ urlpatterns = [
     path('transaction/edit/<int:transaction_id>/', views.edit_transaction, name='edit_transaction'),
 
     path('add_user/', views.add_user, name='add_user'),
+    path('verify_email/', views.verify_email, name='verify_email'),
     path('delete_user/', views.delete_user, name='delete_user'),
     #https://dair12.pythonanywhere.com/get_all_users/
     path('get_all_users/', views.get_all_users, name='get_all_users'),
