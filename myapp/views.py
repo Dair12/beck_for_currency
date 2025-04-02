@@ -11,11 +11,7 @@ import smtplib
 import dns.resolver
 import socket
 
-#sdfvdsvdfsvfdsv
-#sfdvdfvbfsdbfsdb
-#fdbdfvdsvsdf
-#fdvdsfvsdfv sdfv
-#fdvimjsdimfijvodfmsj
+#Dair12
 
 #Not reqest
 def is_email_real(email):
