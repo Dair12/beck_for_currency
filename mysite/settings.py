@@ -27,21 +27,12 @@ DEBUG = True
 
 ALLOWED_HOSTS = ['dair12.pythonanywhere.com']
 
-#EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
-# EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-# EMAIL_HOST = 'smtp.gmail.com'
-# EMAIL_PORT = 587
-# EMAIL_USE_TLS = True
-# EMAIL_HOST_USER = 'yntymak.almazbekuulu2@gmail.com'
-# EMAIL_HOST_PASSWORD = 'Yntymak_0701366303'
-# DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
-
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 EMAIL_HOST = 'smtp.gmail.com'
 EMAIL_PORT = 587
 EMAIL_USE_TLS = True
-EMAIL_HOST_USER = 'dair.aynakulov@gmail.com'
-EMAIL_HOST_PASSWORD = 'giqh bawb pabf cdec'  # тот самый App Password
+EMAIL_HOST_USER = 'send9711@gmail.com '
+EMAIL_HOST_PASSWORD = 'jfzj xssh covg wnvh'
 DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
 
 
