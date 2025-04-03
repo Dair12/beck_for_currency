@@ -15,9 +15,6 @@ import uuid
 from django.core.mail import send_mail
 from django.conf import settings
 
-#efvfewdvdfvd
-# sdkv fdkvsd jfvs
-
 #Not reqest
 pending_users = {}
 
@@ -66,26 +63,42 @@ def send_email(user,password,email):
 
 #Transactions___________________________________________________________________
 
+from datetime import datetime
+
 @csrf_exempt
-def save_transaction(request, operation, currency, quantity, rate):
+def save_transaction(request):
     if request.method == "POST":
         try:
             data = json.loads(request.body)
-            username = data.get('user')
-            user = Users.objects.filter(user=username).first()
+            operation = data.get('operation')
+            currency = data.get('currency')
+            quantity = data.get('quantity')
+            rate = data.get('rate')
+            user_id = data.get('user_id')
+            description = data.get('description', '')
+            created_at_str = data.get('created_at')  # формат "YYYY-MM-DD HH:MM"
+
+            # Проверки
+            if not all([operation, currency, quantity, rate, user_id, created_at_str]):
+                return JsonResponse({"error": "Missing required fields."}, status=400)
+
+            user = Users.objects.filter(id=user_id).first()
             if not user:
                 return JsonResponse({"error": "User not found"}, status=404)
-            currencyadd, created = Currency.objects.get_or_create(name=currency)
-            currency_obj = Currency.objects.filter(name=currency).first()
-            if not currency_obj:
-                return JsonResponse({"error": "Currency not found"}, status=404)
+
+            currency_obj, _ = Currency.objects.get_or_create(name=currency)
 
             rate = float(rate)
             quantity = int(quantity)
-
-            # Обновление баланса пользователя
             transaction_cost = quantity * rate
-            inventory, created = Inventory.objects.get_or_create(user=user, currency=currency_obj)
+
+            try:
+                created_at = datetime.strptime(created_at_str, "%Y-%m-%d %H:%M")
+            except ValueError:
+                return JsonResponse({"error": "Incorrect date format. Use 'YYYY-MM-DD HH:MM'"}, status=400)
+
+            inventory, _ = Inventory.objects.get_or_create(user=user, currency=currency_obj)
+
             if operation == 'buy':
                 user.balance -= transaction_cost
                 inventory.quantity += quantity
@@ -98,42 +111,47 @@ def save_transaction(request, operation, currency, quantity, rate):
             user.save()
             inventory.save()
 
-            rate = float(rate)
-            quantity = int(quantity)
+            # Создаём транзакцию с датой
             transaction = Transaction.objects.create(
                 operation=operation,
                 currency=currency_obj,
                 quantity=quantity,
                 rate=rate,
-                user=user
+                user=user,
+                description=description,
+                created_at=created_at
             )
-            transaction.save()
-            return JsonResponse({"message": "Transaction saved", "transaction": {
-                "operation": transaction.operation,
-                "currency": transaction.currency.name,
-                "quantity": transaction.quantity,
-                "rate": transaction.rate,
-                "created_at": transaction.created_at.strftime("%Y-%m-%d %H:%M:%S"),
-            }})
+
+            return JsonResponse({
+                "message": "Transaction saved",
+                "transaction": {
+                    "operation": transaction.operation,
+                    "currency": transaction.currency.name,
+                    "quantity": transaction.quantity,
+                    "rate": transaction.rate,
+                    "description": transaction.description,
+                    "created_at": transaction.created_at.strftime("%Y-%m-%d %H:%M:%S"),
+                }
+            })
+
         except ValueError:
             return JsonResponse({"error": "Invalid data format"}, status=400)
         except Exception as e:
             return JsonResponse({"error": str(e)}, status=500)
+
     return JsonResponse({"error": "Invalid request method"}, status=405)
-
-
 
 @csrf_exempt
 def get_user_transactions(request):
     if request.method == "POST":
         try:
             data = json.loads(request.body)
-            username = data.get('user')
+            user_id = data.get('user_id')
 
-            if not username:
-                return JsonResponse({"error": "User field is required."}, status=400)
+            if not user_id:
+                return JsonResponse({"error": "user_id field is required."}, status=400)
 
-            user = Users.objects.filter(user=username).first()
+            user = Users.objects.filter(id=user_id).first()
             if not user:
                 return JsonResponse({"error": "User not found"}, status=404)
 
@@ -145,6 +163,7 @@ def get_user_transactions(request):
                     "currency": transaction.currency.name,
                     "quantity": transaction.quantity,
                     "rate": transaction.rate,
+                    "description": transaction.description,
                     "created_at": transaction.created_at.strftime("%Y-%m-%d %H:%M:%S"),
                 }
                 for transaction in transactions
@@ -153,8 +172,6 @@ def get_user_transactions(request):
         except Exception as e:
             return JsonResponse({"error": str(e)}, status=500)
     return JsonResponse({"error": "Invalid request method."}, status=405)
-
-
 
 @csrf_exempt
 def delete_transactions(request):
@@ -169,10 +186,13 @@ def delete_transactions(request):
     return JsonResponse({"error": "Invalid request method"}, status=405)
 
 @csrf_exempt
-def edit_transaction(request, transaction_id):
+def edit_transaction(request):
     if request.method == "POST":
         try:
             body = json.loads(request.body)
+            transaction_id = body.get('transaction_id')
+            if not transaction_id:
+                return JsonResponse({"error": "transaction_id is required."}, status=400)
             transaction = Transaction.objects.get(id=transaction_id)
             transaction.quantity = body.get('quantity', transaction.quantity)
             transaction.rate = body.get('rate', transaction.rate)
@@ -189,18 +209,18 @@ def clear_user_transactions(request):
     if request.method == "POST":
         try:
             data = json.loads(request.body)
-            username = data.get('user')
+            user_id = data.get('user_id')
 
-            if not username:
-                return JsonResponse({"error": "User field is required."}, status=400)
+            if not user_id:
+                return JsonResponse({"error": "user_id field is required."}, status=400)
 
-            user = Users.objects.filter(user=username).first()
+            user = Users.objects.filter(id=user_id).first()
             if not user:
                 return JsonResponse({"error": "User not found"}, status=404)
 
             # Удаляем все транзакции пользователя
             Transaction.objects.filter(user=user).delete()
-            return JsonResponse({"message": f"All transactions for user {username} have been deleted."}, status=200)
+            return JsonResponse({"message": f"All transactions for user ID {user_id} have been deleted."}, status=200)
 
         except Exception as e:
             return JsonResponse({"error": str(e)}, status=500)
@@ -210,33 +230,78 @@ def clear_user_transactions(request):
 
 @csrf_exempt
 def add_currency(request):
-    if request.method == 'GET':
-        name = request.GET.get('name')  # Получаем название валюты из параметра запроса
-        if name:
-            currency, created = Currency.objects.get_or_create(name=name)
-            if created:
-                return JsonResponse({'message': f'Currency "{name}" added successfully.'}, status=200)
-            return JsonResponse({'message': f'Currency "{name}" already exists.'}, status=400)
-        else:
-            return JsonResponse({'error': 'Name parameter is required.'}, status=400)
-    else:
-        return JsonResponse({'error': 'Only GET method is allowed.'}, status=405)
-
-
-def delete_currency(request, name):
-    if request.method == 'GET':  # Используем GET вместо DELETE для простоты URL
+    if request.method == 'POST':
         try:
-            currency = Currency.objects.get(name=name)
-            currency.delete()
-            return JsonResponse({'message': f'Currency "{name}" deleted successfully.'}, status=200)
-        except Currency.DoesNotExist:
-            return JsonResponse({'error': f'Currency "{name}" not found.'}, status=404)
-    else:
-        return JsonResponse({'error': 'Only GET method is allowed.'}, status=405)
+            data = json.loads(request.body)
+            user_id = data.get('user_id')
+            name = data.get('name')
+            code = data.get('code')
 
+            if not user_id or not name or not code:
+                return JsonResponse({'error': 'user_id, name, and code are required.'}, status=400)
+
+            user = Users.objects.filter(id=user_id).first()
+            if not user:
+                return JsonResponse({'error': 'User not found.'}, status=404)
+
+            currency, created = Currency.objects.get_or_create(code=code, defaults={'name': name})
+            user.currencies.add(currency)
+
+            return JsonResponse({'message': f'Currency "{currency.name}" ({currency.code}) added to user ID {user_id}.'}, status=200)
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=500)
+    return JsonResponse({'error': 'Invalid request method.'}, status=405)
+
+@csrf_exempt
+def delete_currency(request):
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            user_id = data.get('user_id')
+            currency_id = data.get('currency_id')
+
+            if not user_id or not currency_id:
+                return JsonResponse({'error': 'Both user_id and currency_id are required.'}, status=400)
+
+            user = Users.objects.filter(id=user_id).first()
+            if not user:
+                return JsonResponse({'error': 'User not found'}, status=404)
+
+            currency = Currency.objects.filter(id=currency_id).first()
+            if not currency:
+                return JsonResponse({'error': 'Currency not found'}, status=404)
+
+            user.currencies.remove(currency)
+
+            return JsonResponse({
+                'message': f'Currency "{currency.name}" (ID {currency.id}) removed from user ID {user_id}.'
+            }, status=200)
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=500)
+    else:
+        return JsonResponse({'error': 'Only POST method is allowed.'}, status=405)
+
+@csrf_exempt
 def list_currencies(request):
-    currencies = Currency.objects.values_list('name', flat=True)
-    return JsonResponse(list(currencies), safe=False)
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            user_id = data.get('user_id')
+
+            if not user_id:
+                return JsonResponse({'error': 'user_id field is required.'}, status=400)
+
+            user = Users.objects.filter(id=user_id).first()
+            if not user:
+                return JsonResponse({'error': 'User not found'}, status=404)
+
+            currencies = user.currencies.all()
+            currency_list = [[c.id, c.name, c.code] for c in currencies]
+
+            return JsonResponse(currency_list, safe=False)
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=500)
+    return JsonResponse({'error': 'Invalid request method.'}, status=405)
 
 #users__________________________________________________________________________
 
@@ -245,17 +310,17 @@ def add_balance(request):
     if request.method == 'POST':
         try:
             data = json.loads(request.body)
-            username = data.get('user')
+            user_id = data.get('user_id')
             amount = data.get('amount')
 
-            if not username or amount is None:
-                return JsonResponse({'error': 'Both user and amount fields are required.'}, status=400)
+            if not user_id or amount is None:
+                return JsonResponse({'error': 'Both user_id and amount fields are required.'}, status=400)
 
             if amount <= 0:
                 return JsonResponse({'error': 'Amount must be greater than 0.'}, status=400)
 
-            user = get_object_or_404(Users, user=username)
-            user.balance += amount  # Увеличиваем баланс
+            user = get_object_or_404(Users, id=user_id)
+            user.balance += amount
             user.save()
 
             return JsonResponse({'message': 'Balance updated successfully.', 'balance': user.balance}, status=200)
@@ -297,23 +362,26 @@ def add_user(request):
 
     return JsonResponse({'error': 'Invalid HTTP method.'}, status=405)
 
-
 @csrf_exempt
 def delete_user(request):
     if request.method == 'DELETE':
         try:
             data = json.loads(request.body)
-            user = data.get('user')
+            user_id = data.get('user_id')
 
-            if not user:
-                return JsonResponse({'error': 'User field is required.'}, status=400)
+            if not user_id:
+                return JsonResponse({'error': 'user_id field is required.'}, status=400)
 
-            user_instance = get_object_or_404(Users, user=user)
+            user_instance = get_object_or_404(Users, id=user_id)
             user_instance.delete()
-            return JsonResponse({'message': 'User deleted successfully.'})
+
+            return JsonResponse({'message': 'User deleted successfully.'}, status=200)
 
         except json.JSONDecodeError:
             return JsonResponse({'error': 'Invalid JSON input.'}, status=400)
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=500)
+
     return JsonResponse({'error': 'Invalid HTTP method.'}, status=405)
 
 @csrf_exempt
@@ -336,7 +404,7 @@ def login_user(request):
             if user.password != password:
                 return JsonResponse({'error': 'Invalid password.'}, status=401)
 
-            return JsonResponse({'message': f'Welcome back, {user.user}!', 'user': user.user, 'email': user.email, 'balance': user.balance}, status=200)
+            return JsonResponse({'message': f'Welcome back, {user.user}!', 'id': user.id, 'user': user.user, 'email': user.email, 'balance': user.balance}, status=200)
 
         except json.JSONDecodeError:
             return JsonResponse({'error': 'Invalid JSON input.'}, status=400)
@@ -345,39 +413,16 @@ def login_user(request):
     return JsonResponse({'error': 'Invalid request method.'}, status=405)
 
 @csrf_exempt
-def get_all_users(request):
-    if request.method == 'GET':
-        users = Users.objects.all()
-        user_list = [
-            {
-                'user': user.user,
-                'email': user.email,
-                'balance': user.balance
-            }
-            for user in users
-        ]
-        return JsonResponse(user_list, safe=False)
-    return JsonResponse({'error': 'Invalid request method'}, status=405)
-
-# @csrf_exempt
-# def get_all_users(request):
-#     if request.method == 'GET':
-#         users = Users.objects.all()
-#         user_list = [{'user': user.user} for user in users]
-#         return JsonResponse(user_list, safe=False)
-#     return JsonResponse({'error': 'Invalid request method'}, status=405)
-
-@csrf_exempt
 def get_user_inventory(request):
     if request.method == 'POST':
         try:
             data = json.loads(request.body)
-            username = data.get('user')
+            user_id = data.get('user_id')
 
-            if not username:
-                return JsonResponse({'error': 'User field is required.'}, status=400)
+            if not user_id:
+                return JsonResponse({'error': 'user_id field is required.'}, status=400)
 
-            user = get_object_or_404(Users, user=username)
+            user = get_object_or_404(Users, id=user_id)
             inventory = Inventory.objects.filter(user=user)
 
             inventory_data = [
@@ -401,12 +446,12 @@ def reset_user_data(request):
     if request.method == 'POST':
         try:
             data = json.loads(request.body)
-            username = data.get('user')
+            user_id = data.get('user_id')
 
-            if not username:
-                return JsonResponse({'error': 'User field is required.'}, status=400)
+            if not user_id:
+                return JsonResponse({'error': 'user_id field is required.'}, status=400)
 
-            user = get_object_or_404(Users, user=username)
+            user = get_object_or_404(Users, id=user_id)
 
             # Обнуление баланса
             user.balance = 0.0
@@ -423,4 +468,3 @@ def reset_user_data(request):
             return JsonResponse({'error': str(e)}, status=500)
 
     return JsonResponse({'error': 'Invalid request method.'}, status=405)
-
