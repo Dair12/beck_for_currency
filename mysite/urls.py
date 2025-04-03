@@ -46,6 +46,7 @@ urlpatterns = [
     path('clear_transactions/', views.clear_user_transactions, name='clear_user_transactions'),
 
     path('add_balance/', views.add_balance, name='add_balance'),
+    path('add_inventory_amount/', views.add_inventory_amount, name='add_inventory_amount'),
 
     path('get_user_inventory/', views.get_user_inventory, name='get_user_inventory'),
 
