@@ -18,6 +18,15 @@ from django.conf import settings
 #Not reqest
 pending_users = {}
 
+def add_amount_to_currency(user_id, currency_id, amount):
+    user = get_object_or_404(Users, id=user_id)
+    currency = get_object_or_404(Currency, id=currency_id)
+
+    inventory, _ = Inventory.objects.get_or_create(user=user, currency=currency)
+    inventory.quantity += amount
+    inventory.add += amount
+    inventory.save()
+
 def is_email_real(email):
     try:
         domain = email.split('@')[1]
@@ -236,8 +245,9 @@ def add_currency(request):
             user_id = data.get('user_id')
             name = data.get('name')
             code = data.get('code')
+            amount = data.get('amount')
 
-            if not user_id or not name or not code:
+            if not user_id or not name or not code or amount is None:
                 return JsonResponse({'error': 'user_id, name, and code are required.'}, status=400)
 
             user = Users.objects.filter(id=user_id).first()
@@ -247,10 +257,46 @@ def add_currency(request):
             currency, created = Currency.objects.get_or_create(code=code, defaults={'name': name})
             user.currencies.add(currency)
 
+            add_amount_to_currency(user_id, currency.id, amount)
+
             return JsonResponse({'message': f'Currency "{currency.name}" ({currency.code}) added to user ID {user_id}.'}, status=200)
         except Exception as e:
             return JsonResponse({'error': str(e)}, status=500)
     return JsonResponse({'error': 'Invalid request method.'}, status=405)
+
+@csrf_exempt
+def add_inventory_amount(request):
+    if request.method == "POST":
+        try:
+            data = json.loads(request.body)
+            user_id = data.get('user_id')
+            currency_id = data.get('currency_id')
+            amount = data.get('amount')
+
+            if not user_id or not currency_id or amount is None:
+                return JsonResponse({'error': 'user_id, currency_id, and amount are required.'}, status=400)
+
+            if amount <= 0:
+                return JsonResponse({'error': 'Amount must be greater than 0.'}, status=400)
+
+            add_amount_to_currency(user_id, currency_id, amount)
+
+            return JsonResponse({
+                'message': 'Amount successfully added to inventory.',
+                'inventory': {
+                    'user': user.user,
+                    'currency': currency.name,
+                    'quantity': inventory.quantity,
+                    'add': inventory.add
+                }
+            }, status=200)
+
+        except json.JSONDecodeError:
+            return JsonResponse({'error': 'Invalid JSON input.'}, status=400)
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=500)
+    else:
+        return JsonResponse({'error': 'Invalid request method.'}, status=405)
 
 @csrf_exempt
 def delete_currency(request):
@@ -321,6 +367,7 @@ def add_balance(request):
 
             user = get_object_or_404(Users, id=user_id)
             user.balance += amount
+            user.add += amount
             user.save()
 
             return JsonResponse({'message': 'Balance updated successfully.', 'balance': user.balance}, status=200)
@@ -455,6 +502,7 @@ def reset_user_data(request):
 
             # Обнуление баланса
             user.balance = 0.0
+            user.add = 0.0
             user.save()
 
             # Обнуление инвентаря

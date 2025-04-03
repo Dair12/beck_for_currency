@@ -42,6 +42,7 @@ class Inventory(models.Model):
     user = models.ForeignKey('Users', on_delete=models.CASCADE, related_name='inventory')
     currency = models.ForeignKey('Currency', on_delete=models.CASCADE, related_name='inventory')
     quantity = models.FloatField(default=0.0)
+    add = models.FloatField(default=0.0)
 
     def __str__(self):
         return f"{self.user.user} - {self.currency.name}: {self.quantity}"
