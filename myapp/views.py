@@ -1,9 +1,6 @@
 from django.http import HttpResponse, JsonResponse
 from django.views.decorators.csrf import csrf_exempt
-from .models import Transaction
-from .models import Currency
-from .models import Users
-from .models import Inventory
+from .models import Transaction, Inventory, Users,Currency
 from django.shortcuts import get_object_or_404
 from django.db import models
 import json
@@ -11,7 +8,6 @@ import smtplib
 import dns.resolver
 import socket
 import uuid
-from django.core.paginator import Paginator
 from django.conf import settings
 from django.core.mail import EmailMultiAlternatives
 
