@@ -1,4 +1,3 @@
-from django.shortcuts import render
 from django.http import HttpResponse, JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from .models import Transaction
@@ -12,7 +11,8 @@ import smtplib
 import dns.resolver
 import socket
 import uuid
-from django.core.mail import send_mail
+from django.core.paginator import Paginator
+from django.views.decorators.csrf import csrf_exempt
 from django.conf import settings
 from django.core.mail import EmailMultiAlternatives
 
@@ -216,7 +216,7 @@ def save_transaction(request):
 
             rate = float(rate)
             quantity = int(quantity)
-            transaction_cost = quantity * rate
+            #transaction_cost = quantity * rate
 
             try:
                 created_at = datetime.strptime(created_at_str, "%Y-%m-%d %H:%M")
@@ -269,12 +269,46 @@ def save_transaction(request):
 
     return JsonResponse({"error": "Invalid request method"}, status=405)
 
+# @csrf_exempt
+# def get_user_transactions(request):
+#     if request.method == "POST":
+#         try:
+#             data = json.loads(request.body)
+#             user_id = data.get('user_id')
+
+#             if not user_id:
+#                 return JsonResponse({"error": "user_id field is required."}, status=400)
+
+#             user = Users.objects.filter(id=user_id).first()
+#             if not user:
+#                 return JsonResponse({"error": "User not found"}, status=404)
+
+#             transactions = Transaction.objects.filter(user=user)
+#             data = [
+#                 {
+#                     "id": transaction.id,
+#                     "operation": transaction.operation,
+#                     "currency": transaction.currency.name,
+#                     "quantity": transaction.quantity,
+#                     "rate": transaction.rate,
+#                     "description": transaction.description,
+#                     "created_at": transaction.created_at.strftime("%Y-%m-%d %H:%M:%S"),
+#                 }
+#                 for transaction in transactions
+#             ]
+#             return JsonResponse(data, safe=False)
+#         except Exception as e:
+#             return JsonResponse({"error": str(e)}, status=500)
+#     return JsonResponse({"error": "Invalid request method."}, status=405)
+
 @csrf_exempt
 def get_user_transactions(request):
     if request.method == "POST":
         try:
             data = json.loads(request.body)
             user_id = data.get('user_id')
+            page = data.get('page', 1)
+            page_size = data.get('page_size', 10)  # по умолчанию 10 транзакций на страницу
 
             if not user_id:
                 return JsonResponse({"error": "user_id field is required."}, status=400)
@@ -283,7 +317,10 @@ def get_user_transactions(request):
             if not user:
                 return JsonResponse({"error": "User not found"}, status=404)
 
-            transactions = Transaction.objects.filter(user=user)
+            transactions = Transaction.objects.filter(user=user).order_by('-created_at')
+            paginator = Paginator(transactions, page_size)
+            current_page = paginator.get_page(page)
+
             data = [
                 {
                     "id": transaction.id,
@@ -294,11 +331,18 @@ def get_user_transactions(request):
                     "description": transaction.description,
                     "created_at": transaction.created_at.strftime("%Y-%m-%d %H:%M:%S"),
                 }
-                for transaction in transactions
+                for transaction in current_page
             ]
-            return JsonResponse(data, safe=False)
+
+            return JsonResponse({
+                "transactions": data,
+                "page": current_page.number,
+                "total_pages": paginator.num_pages,
+                "total_items": paginator.count
+            })
         except Exception as e:
             return JsonResponse({"error": str(e)}, status=500)
+
     return JsonResponse({"error": "Invalid request method."}, status=405)
 
 @csrf_exempt
@@ -307,6 +351,7 @@ def delete_transactions(request):
         try:
             body = json.loads(request.body)
             ids = body.get('ids', [])
+            user_id=body.get('user_id')
             Transaction.objects.filter(id__in=ids).delete()
             calculate_user_balance_and_inventory(user_id)
             return JsonResponse({"message": "Transactions deleted successfully."}, status=200)
@@ -408,7 +453,7 @@ def add_currency(request):
 
             add_amount_to_currency(user_id, currency.id, amount)
 
-            return JsonResponse({'message': f'Currency "{currency.name}" ({currency.code}) added to user ID {user_id}.'}, status=200)
+            return JsonResponse({'message': f'Currency "{currency.name}" ({currency.code}) added to user ID {user_id}.','currency_id':currency.id}, status=200)
         except Exception as e:
             return JsonResponse({'error': str(e)}, status=500)
     return JsonResponse({'error': 'Invalid request method.'}, status=405)
@@ -502,9 +547,6 @@ def list_currencies(request):
     return JsonResponse({'error': 'Invalid request method.'}, status=405)
 
 #users__________________________________________________________________________
-from django.template.loader import render_to_string
-from django.shortcuts import redirect
-
 def reset_password_form(request):
     token = request.GET.get('token')
     if not token:
