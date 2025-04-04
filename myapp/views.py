@@ -14,9 +14,11 @@ import socket
 import uuid
 from django.core.mail import send_mail
 from django.conf import settings
+from django.core.mail import EmailMultiAlternatives
 
 #Not reqest
 pending_users = {}
+reset_tokens = {}
 
 def reset_user_data_by_id(user_id):
     try:
@@ -127,18 +129,63 @@ def verify_email(request):
 
     return JsonResponse({'message': 'Registration successful. Welcome, ' + new_user.user})
 
-def send_email(user,password,email):
+# def send_email(user,password,email):
+#     token = str(uuid.uuid4())
+#     pending_users[token] = {'user': user, 'password': password, 'email': email}
+
+#     verify_url = f"https://dair12.pythonanywhere.com/verify_email?token={token}"
+#     send_mail(
+#         'Confirm your registration',
+#         f'Hi {user},\n\nClick the link to finish registration:\n{verify_url}',
+#         settings.DEFAULT_FROM_EMAIL,
+#         [email],
+#         fail_silently=False,
+#     )
+
+def send_email(user, password, email):
     token = str(uuid.uuid4())
     pending_users[token] = {'user': user, 'password': password, 'email': email}
 
     verify_url = f"https://dair12.pythonanywhere.com/verify_email?token={token}"
-    send_mail(
-        'Confirm your registration',
-        f'Hi {user},\n\nClick the link to finish registration:\n{verify_url}',
-        settings.DEFAULT_FROM_EMAIL,
-        [email],
-        fail_silently=False,
-    )
+
+    subject = "Confirm your registration"
+    from_email = settings.DEFAULT_FROM_EMAIL
+    to = [email]
+
+    # Текстовая версия (на случай если HTML не поддерживается)
+    text_content = f"""Hi {user},
+
+Thank you for registering at My App!
+
+Please click the link below to verify your email address:
+{verify_url}
+
+If you did not request this, just ignore this message.
+
+Best regards,
+The My App Team
+"""
+
+    # HTML-версия письма
+    html_content = f"""
+    <html>
+        <body>
+            <p>Hi {user},</p>
+            <p>Thank you for registering at <strong>My App</strong>!</p>
+            <p>Please click the link below to verify your email address:</p>
+            <p><a href="{verify_url}">Verify your email</a></p>
+            <p>If you did not request this, just ignore this message.</p>
+            <br>
+            <p>Best regards,<br><strong>The My App Team</strong></p>
+        </body>
+    </html>
+    """
+
+    # Отправка письма
+    msg = EmailMultiAlternatives(subject, text_content, from_email, to)
+    msg.attach_alternative(html_content, "text/html")
+    msg.send()
+
 
 #Transactions___________________________________________________________________
 
@@ -455,6 +502,113 @@ def list_currencies(request):
     return JsonResponse({'error': 'Invalid request method.'}, status=405)
 
 #users__________________________________________________________________________
+from django.template.loader import render_to_string
+from django.shortcuts import redirect
+
+def reset_password_form(request):
+    token = request.GET.get('token')
+    if not token:
+        return HttpResponse("Invalid token", status=400)
+
+    html = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Reset Password</title>
+        <meta charset="utf-8">
+    </head>
+    <body>
+        <h2>Enter new password</h2>
+        <form method="POST" action="/confirm_password_reset/">
+            <input type="hidden" name="token" value="{token}" />
+            <label>New password:</label><br>
+            <input type="password" name="password1" required><br><br>
+            <label>Repeat password:</label><br>
+            <input type="password" name="password2" required><br><br>
+            <button type="submit">Reset</button>
+        </form>
+    </body>
+    </html>
+    """
+    return HttpResponse(html)
+
+@csrf_exempt
+def request_password_reset(request):
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            email = data.get('email')
+
+            if not email:
+                return JsonResponse({'error': 'Email is required.'}, status=400)
+
+            user = Users.objects.filter(email=email).first()
+            if not user:
+                return JsonResponse({'error': 'User with this email not found.'}, status=404)
+
+            token = str(uuid.uuid4())
+            reset_tokens[token] = user.id
+
+            reset_url = f"https://dair12.pythonanywhere.com/reset_password_form/?token={token}"
+
+            subject = "Reset your password"
+            from_email = settings.DEFAULT_FROM_EMAIL
+            to = [email]
+
+            text = f"Click the link to reset your password:\n{reset_url}"
+            html = f"""
+            <html>
+                <body>
+                    <p>Click the link to reset your password:</p>
+                    <a href="{reset_url}">{reset_url}</a>
+                </body>
+            </html>
+            """
+
+            msg = EmailMultiAlternatives(subject, text, from_email, to)
+            msg.attach_alternative(html, "text/html")
+            msg.send()
+
+            return JsonResponse({'message': 'Password reset link has been sent to your email.'}, status=200)
+
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=500)
+    return JsonResponse({'error': 'Invalid request method'}, status=405)
+
+@csrf_exempt
+def confirm_password_reset(request):
+    if request.method == 'POST':
+        try:
+            if request.content_type == 'application/json':
+                data = json.loads(request.body)
+            else:
+                data = request.POST
+
+            token = data.get('token')
+            password1 = data.get('password1')
+            password2 = data.get('password2')
+
+            if not token or not password1 or not password2:
+                return JsonResponse({'error': 'All fields are required.'}, status=400)
+
+            if password1 != password2:
+                return JsonResponse({'error': 'Passwords do not match.'}, status=400)
+
+            user_id = reset_tokens.pop(token, None)
+            if not user_id:
+                return JsonResponse({'error': 'Invalid or expired token.'}, status=400)
+
+            user = Users.objects.filter(id=user_id).first()
+            if not user:
+                return JsonResponse({'error': 'User not found.'}, status=404)
+
+            user.password = password1
+            user.save()
+
+            return HttpResponse("Password has been successfully reset.")
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=500)
+    return JsonResponse({'error': 'Invalid request method'}, status=405)
 
 @csrf_exempt
 def add_balance(request):

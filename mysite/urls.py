@@ -41,6 +41,10 @@ urlpatterns = [
 
     path('add_user/', views.add_user, name='add_user'),
     path('verify_email/', views.verify_email, name='verify_email'),
+    path('request_password_reset/', views.request_password_reset, name='request_password_reset'),
+    path('confirm_password_reset/', views.confirm_password_reset, name='confirm_password_reset'),
+    path('reset_password_form/', views.reset_password_form, name='reset_password_form'),
+
     path('delete_user/', views.delete_user, name='delete_user'),
 
     path('clear_transactions/', views.clear_user_transactions, name='clear_user_transactions'),

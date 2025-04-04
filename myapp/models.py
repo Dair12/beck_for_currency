@@ -28,8 +28,8 @@ class Currency(models.Model):
         return self.name
 
 class Users(models.Model):
-    user = models.CharField(max_length=10)
-    password=models.CharField(max_length=10)
+    user = models.CharField(max_length=30)
+    password=models.CharField(max_length=30)
     email = models.EmailField(unique=True)
     balance = models.FloatField(default=0.0)
     add = models.FloatField(default=0.0)
