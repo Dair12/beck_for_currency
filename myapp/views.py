@@ -18,6 +18,76 @@ from django.conf import settings
 #Not reqest
 pending_users = {}
 
+def reset_user_data_by_id(user_id):
+    try:
+        user = get_object_or_404(Users, id=user_id)
+
+        # Сброс баланса и add
+        user.balance = 0.0
+        user.add = 0.0
+        user.save()
+
+        # Сброс quantity и add в инвентаре
+        Inventory.objects.filter(user=user).update(quantity=0.0, add=0.0)
+
+        return "Баланс и инвентарь успешно сброшены"
+
+    except Exception as e:
+        return f"Ошибка при сбросе: {str(e)}"
+
+def calculate_user_balance_and_inventory(user_id):
+    from .models import Users, Inventory, Transaction
+
+    try:
+        user = Users.objects.get(id=user_id)
+    except Users.DoesNotExist:
+        return "Пользователь не найден"
+
+    # Словарь для временного хранения количества по каждой валюте
+    inventory_quantities = {}
+
+    # Обрабатываем все транзакции пользователя
+    transactions = Transaction.objects.filter(user=user)
+
+    balance = 0
+
+    for tx in transactions:
+        amount = tx.quantity * tx.rate
+        currency_id = tx.currency.id
+
+        if currency_id not in inventory_quantities:
+            inventory_quantities[currency_id] = 0
+
+        if tx.operation == 'buy':
+            balance -= amount
+            inventory_quantities[currency_id] += tx.quantity
+        elif tx.operation == 'sell':
+            balance += amount
+            inventory_quantities[currency_id] -= tx.quantity
+
+    # Добавляем user.add
+    final_balance = balance + user.add
+
+    # Обновляем или создаем записи инвентаря
+    for currency_id, calculated_quantity in inventory_quantities.items():
+        try:
+            inventory = Inventory.objects.get(user=user, currency_id=currency_id)
+        except Inventory.DoesNotExist:
+            inventory = Inventory.objects.create(user=user, currency_id=currency_id, quantity=0, add=0)
+
+        # Применяем add
+        final_quantity = calculated_quantity + inventory.add
+
+        # Обновляем количество
+        inventory.quantity = final_quantity
+        inventory.save()
+
+    # Обновляем баланс пользователя
+    user.balance = final_balance
+    user.save()
+
+    return "Баланс и инвентарь обновлены"
+
 def add_amount_to_currency(user_id, currency_id, amount):
     user = get_object_or_404(Users, id=user_id)
     currency = get_object_or_404(Currency, id=currency_id)
@@ -106,19 +176,19 @@ def save_transaction(request):
             except ValueError:
                 return JsonResponse({"error": "Incorrect date format. Use 'YYYY-MM-DD HH:MM'"}, status=400)
 
-            inventory, _ = Inventory.objects.get_or_create(user=user, currency=currency_obj)
+            # inventory, _ = Inventory.objects.get_or_create(user=user, currency=currency_obj)
 
-            if operation == 'buy':
-                user.balance -= transaction_cost
-                inventory.quantity += quantity
-            elif operation == 'sell':
-                user.balance += transaction_cost
-                inventory.quantity -= quantity
-            else:
-                return JsonResponse({"error": "Invalid operation"}, status=400)
+            # if operation == 'buy':
+            #     user.balance -= transaction_cost
+            #     inventory.quantity += quantity
+            # elif operation == 'sell':
+            #     user.balance += transaction_cost
+            #     inventory.quantity -= quantity
+            # else:
+            #     return JsonResponse({"error": "Invalid operation"}, status=400)
 
-            user.save()
-            inventory.save()
+            # user.save()
+            # inventory.save()
 
             # Создаём транзакцию с датой
             transaction = Transaction.objects.create(
@@ -130,6 +200,8 @@ def save_transaction(request):
                 description=description,
                 created_at=created_at
             )
+
+            calculate_user_balance_and_inventory(user_id)
 
             return JsonResponse({
                 "message": "Transaction saved",
@@ -189,6 +261,7 @@ def delete_transactions(request):
             body = json.loads(request.body)
             ids = body.get('ids', [])
             Transaction.objects.filter(id__in=ids).delete()
+            calculate_user_balance_and_inventory(user_id)
             return JsonResponse({"message": "Transactions deleted successfully."}, status=200)
         except Exception as e:
             return JsonResponse({"error": str(e)}, status=500)
@@ -202,15 +275,43 @@ def edit_transaction(request):
             transaction_id = body.get('transaction_id')
             if not transaction_id:
                 return JsonResponse({"error": "transaction_id is required."}, status=400)
+
             transaction = Transaction.objects.get(id=transaction_id)
-            transaction.quantity = body.get('quantity', transaction.quantity)
-            transaction.rate = body.get('rate', transaction.rate)
+
+            # Сохраняем user_id до изменений
+            user_id = transaction.user.id
+
+            # Обновляем поля, если они переданы
+            if 'operation' in body:
+                transaction.operation = body['operation']
+            if 'currency' in body:
+                currency_name = body['currency']
+                currency_obj, _ = Currency.objects.get_or_create(name=currency_name)
+                transaction.currency = currency_obj
+            if 'quantity' in body:
+                transaction.quantity = int(body['quantity'])
+            if 'rate' in body:
+                transaction.rate = float(body['rate'])
+            if 'description' in body:
+                transaction.description = body['description']
+            if 'created_at' in body:
+                try:
+                    transaction.created_at = datetime.strptime(body['created_at'], "%Y-%m-%d %H:%M")
+                except ValueError:
+                    return JsonResponse({"error": "Incorrect date format. Use 'YYYY-MM-DD HH:MM'"}, status=400)
+
             transaction.save()
-            return JsonResponse({"message": "Transaction updated successfully."}, status=200)
+
+            # Пересчёт баланса
+            calculate_user_balance_and_inventory(user_id)
+
+            return JsonResponse({"message": "Transaction updated and balance recalculated."}, status=200)
+
         except Transaction.DoesNotExist:
             return JsonResponse({"error": "Transaction not found"}, status=404)
         except Exception as e:
             return JsonResponse({"error": str(e)}, status=500)
+
     return JsonResponse({"error": "Invalid request method"}, status=405)
 
 @csrf_exempt
@@ -229,6 +330,7 @@ def clear_user_transactions(request):
 
             # Удаляем все транзакции пользователя
             Transaction.objects.filter(user=user).delete()
+            reset_user_data_by_id(user_id)
             return JsonResponse({"message": f"All transactions for user ID {user_id} have been deleted."}, status=200)
 
         except Exception as e:
@@ -281,15 +383,7 @@ def add_inventory_amount(request):
 
             add_amount_to_currency(user_id, currency_id, amount)
 
-            return JsonResponse({
-                'message': 'Amount successfully added to inventory.',
-                'inventory': {
-                    'user': user.user,
-                    'currency': currency.name,
-                    'quantity': inventory.quantity,
-                    'add': inventory.add
-                }
-            }, status=200)
+            return JsonResponse({'message': 'Amount successfully added to inventory.',}, status=200)
 
         except json.JSONDecodeError:
             return JsonResponse({'error': 'Invalid JSON input.'}, status=400)
@@ -317,11 +411,22 @@ def delete_currency(request):
             if not currency:
                 return JsonResponse({'error': 'Currency not found'}, status=404)
 
+            # Удаляем все транзакции пользователя с этой валютой
+            Transaction.objects.filter(user=user, currency=currency).delete()
+
+            # Удаляем валюту из связей ManyToMany
             user.currencies.remove(currency)
 
+            # Удаляем запись из Inventory (если есть)
+            Inventory.objects.filter(user=user, currency=currency).delete()
+
+            # Пересчитываем баланс и инвентарь
+            calculate_user_balance_and_inventory(user_id)
+
             return JsonResponse({
-                'message': f'Currency "{currency.name}" (ID {currency.id}) removed from user ID {user_id}.'
+                'message': f'Currency "{currency.name}" (ID {currency.id}) and all related transactions for user ID {user_id} have been removed.'
             }, status=200)
+
         except Exception as e:
             return JsonResponse({'error': str(e)}, status=500)
     else:
@@ -498,15 +603,7 @@ def reset_user_data(request):
             if not user_id:
                 return JsonResponse({'error': 'user_id field is required.'}, status=400)
 
-            user = get_object_or_404(Users, id=user_id)
-
-            # Обнуление баланса
-            user.balance = 0.0
-            user.add = 0.0
-            user.save()
-
-            # Обнуление инвентаря
-            Inventory.objects.filter(user=user).update(quantity=0.0)
+            reset_user_data_by_id(user_id)
 
             return JsonResponse({'message': 'User balance and inventory reset successfully.'}, status=200)
 
