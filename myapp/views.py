@@ -12,7 +12,6 @@ import dns.resolver
 import socket
 import uuid
 from django.core.paginator import Paginator
-from django.views.decorators.csrf import csrf_exempt
 from django.conf import settings
 from django.core.mail import EmailMultiAlternatives
 
@@ -269,46 +268,12 @@ def save_transaction(request):
 
     return JsonResponse({"error": "Invalid request method"}, status=405)
 
-# @csrf_exempt
-# def get_user_transactions(request):
-#     if request.method == "POST":
-#         try:
-#             data = json.loads(request.body)
-#             user_id = data.get('user_id')
-
-#             if not user_id:
-#                 return JsonResponse({"error": "user_id field is required."}, status=400)
-
-#             user = Users.objects.filter(id=user_id).first()
-#             if not user:
-#                 return JsonResponse({"error": "User not found"}, status=404)
-
-#             transactions = Transaction.objects.filter(user=user)
-#             data = [
-#                 {
-#                     "id": transaction.id,
-#                     "operation": transaction.operation,
-#                     "currency": transaction.currency.name,
-#                     "quantity": transaction.quantity,
-#                     "rate": transaction.rate,
-#                     "description": transaction.description,
-#                     "created_at": transaction.created_at.strftime("%Y-%m-%d %H:%M:%S"),
-#                 }
-#                 for transaction in transactions
-#             ]
-#             return JsonResponse(data, safe=False)
-#         except Exception as e:
-#             return JsonResponse({"error": str(e)}, status=500)
-#     return JsonResponse({"error": "Invalid request method."}, status=405)
-
 @csrf_exempt
 def get_user_transactions(request):
     if request.method == "POST":
         try:
             data = json.loads(request.body)
             user_id = data.get('user_id')
-            page = data.get('page', 1)
-            page_size = data.get('page_size', 10)  # по умолчанию 10 транзакций на страницу
 
             if not user_id:
                 return JsonResponse({"error": "user_id field is required."}, status=400)
@@ -317,10 +282,7 @@ def get_user_transactions(request):
             if not user:
                 return JsonResponse({"error": "User not found"}, status=404)
 
-            transactions = Transaction.objects.filter(user=user).order_by('-created_at')
-            paginator = Paginator(transactions, page_size)
-            current_page = paginator.get_page(page)
-
+            transactions = Transaction.objects.filter(user=user)
             data = [
                 {
                     "id": transaction.id,
@@ -331,18 +293,11 @@ def get_user_transactions(request):
                     "description": transaction.description,
                     "created_at": transaction.created_at.strftime("%Y-%m-%d %H:%M:%S"),
                 }
-                for transaction in current_page
+                for transaction in transactions
             ]
-
-            return JsonResponse({
-                "transactions": data,
-                "page": current_page.number,
-                "total_pages": paginator.num_pages,
-                "total_items": paginator.count
-            })
+            return JsonResponse(data, safe=False)
         except Exception as e:
             return JsonResponse({"error": str(e)}, status=500)
-
     return JsonResponse({"error": "Invalid request method."}, status=405)
 
 @csrf_exempt
