@@ -254,6 +254,7 @@ def save_transaction(request):
                     "rate": transaction.rate,
                     "description": transaction.description,
                     "created_at": transaction.created_at.strftime("%Y-%m-%d %H:%M:%S"),
+                    "transaction_id":transaction.id
                 }
             })
 

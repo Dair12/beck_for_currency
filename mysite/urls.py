@@ -20,42 +20,30 @@ from myapp import views
 urlpatterns = [
     path('admin/', admin.site.urls),
 
-    #https://dair12.pythonanywhere.com/transaction/buy/USD/100/74/Dair/
+    # Transactions
     path('transaction/', views.save_transaction, name='save_transaction'),
-
-    #https://dair12.pythonanywhere.com/transactions/
     path('transactions/', views.get_user_transactions, name='get_user_transactions'),
-
-    #https://dair12.pythonanywhere.com/add_currency/?name=USD
-    path('add_currency/', views.add_currency, name='add_currency'),
-
-    #https://dair12.pythonanywhere.com/delete_currency/USD/
-    path('delete_currency/', views.delete_currency, name='delete_currency'),
-
-    #https://dair12.pythonanywhere.com/list_currencies/
-    path('list_currencies/', views.list_currencies, name='list_currencies'),
-
     path('transaction/delete/', views.delete_transactions, name='delete_transactions'),
-
     path('transaction/edit/', views.edit_transaction, name='edit_transaction'),
+    path('clear_transactions/', views.clear_user_transactions, name='clear_user_transactions'),
 
+    # Currency
+    path('add_currency/', views.add_currency, name='add_currency'),
+    path('delete_currency/', views.delete_currency, name='delete_currency'),
+    path('list_currencies/', views.list_currencies, name='list_currencies'),
+    path('add_inventory_amount/', views.add_inventory_amount, name='add_inventory_amount'),
+
+    # Users
     path('add_user/', views.add_user, name='add_user'),
+    path('delete_user/', views.delete_user, name='delete_user'),
+    path('add_balance/', views.add_balance, name='add_balance'),
+    path('get_user_inventory/', views.get_user_inventory, name='get_user_inventory'),
+    path('reset_user_data/', views.reset_user_data, name='reset_user_data'),
+
+    # Auth
     path('verify_email/', views.verify_email, name='verify_email'),
     path('request_password_reset/', views.request_password_reset, name='request_password_reset'),
     path('confirm_password_reset/', views.confirm_password_reset, name='confirm_password_reset'),
     path('reset_password_form/', views.reset_password_form, name='reset_password_form'),
-
-    path('delete_user/', views.delete_user, name='delete_user'),
-
-    path('clear_transactions/', views.clear_user_transactions, name='clear_user_transactions'),
-
-    path('add_balance/', views.add_balance, name='add_balance'),
-    path('add_inventory_amount/', views.add_inventory_amount, name='add_inventory_amount'),
-
-    path('get_user_inventory/', views.get_user_inventory, name='get_user_inventory'),
-
-    path('reset_user_data/', views.reset_user_data, name='reset_user_data'),
-
     path('login_user/', views.login_user, name='login_user'),
-
 ]
