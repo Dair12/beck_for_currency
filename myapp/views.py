@@ -1,15 +1,20 @@
 from django.http import HttpResponse, JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from .models import Transaction, Inventory, Users,Currency
-from django.shortcuts import get_object_or_404
+from django.shortcuts import get_object_or_404, render
 from django.db import models
+from django.core.mail import send_mail
 import json
 import smtplib
 import dns.resolver
 import socket
 import uuid
+from django.template.loader import render_to_string
 from django.conf import settings
 from django.core.mail import EmailMultiAlternatives
+from rest_framework.decorators import api_view
+from rest_framework.response import Response
+from rest_framework import status
 
 #Not reqest
 pending_users = {}
@@ -122,20 +127,7 @@ def verify_email(request):
     new_user = Users(user=data['user'], password=data['password'], email=data['email'])
     new_user.save()
 
-    return JsonResponse({'message': 'Registration successful. Welcome, ' + new_user.user})
-
-# def send_email(user,password,email):
-#     token = str(uuid.uuid4())
-#     pending_users[token] = {'user': user, 'password': password, 'email': email}
-
-#     verify_url = f"https://dair12.pythonanywhere.com/verify_email?token={token}"
-#     send_mail(
-#         'Confirm your registration',
-#         f'Hi {user},\n\nClick the link to finish registration:\n{verify_url}',
-#         settings.DEFAULT_FROM_EMAIL,
-#         [email],
-#         fail_silently=False,
-#     )
+    return render(request, 'email_verification/success.html', {'username': new_user.user})
 
 def send_email(user, password, email):
     token = str(uuid.uuid4())
@@ -150,31 +142,22 @@ def send_email(user, password, email):
     # Текстовая версия (на случай если HTML не поддерживается)
     text_content = f"""Hi {user},
 
-Thank you for registering at My App!
+    Thank you for registering at ADAY!
 
-Please click the link below to verify your email address:
-{verify_url}
+    Please click the link below to verify your email address:
+    {verify_url}
 
-If you did not request this, just ignore this message.
+    If you did not request this, just ignore this message.
 
-Best regards,
-The My App Team
-"""
+    Best regards,
+    The ADAY Team
+    """
 
     # HTML-версия письма
-    html_content = f"""
-    <html>
-        <body>
-            <p>Hi {user},</p>
-            <p>Thank you for registering at <strong>My App</strong>!</p>
-            <p>Please click the link below to verify your email address:</p>
-            <p><a href="{verify_url}">Verify your email</a></p>
-            <p>If you did not request this, just ignore this message.</p>
-            <br>
-            <p>Best regards,<br><strong>The My App Team</strong></p>
-        </body>
-    </html>
-    """
+    html_content = render_to_string('email_verification/verify_email.html', {
+        'user': user,
+        'verify_url': verify_url
+    })
 
     # Отправка письма
     msg = EmailMultiAlternatives(subject, text_content, from_email, to)
@@ -422,9 +405,6 @@ def add_inventory_amount(request):
             if not user_id or not currency_id or amount is None:
                 return JsonResponse({'error': 'user_id, currency_id, and amount are required.'}, status=400)
 
-            if amount <= 0:
-                return JsonResponse({'error': 'Amount must be greater than 0.'}, status=400)
-
             add_amount_to_currency(user_id, currency_id, amount)
 
             return JsonResponse({'message': 'Amount successfully added to inventory.',}, status=200)
@@ -504,27 +484,7 @@ def reset_password_form(request):
     if not token:
         return HttpResponse("Invalid token", status=400)
 
-    html = f"""
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <title>Reset Password</title>
-        <meta charset="utf-8">
-    </head>
-    <body>
-        <h2>Enter new password</h2>
-        <form method="POST" action="/confirm_password_reset/">
-            <input type="hidden" name="token" value="{token}" />
-            <label>New password:</label><br>
-            <input type="password" name="password1" required><br><br>
-            <label>Repeat password:</label><br>
-            <input type="password" name="password2" required><br><br>
-            <button type="submit">Reset</button>
-        </form>
-    </body>
-    </html>
-    """
-    return HttpResponse(html)
+    return render(request, 'password/reset_password_form.html', {'token': token})
 
 @csrf_exempt
 def request_password_reset(request):
@@ -550,20 +510,13 @@ def request_password_reset(request):
             to = [email]
 
             text = f"Click the link to reset your password:\n{reset_url}"
-            html = f"""
-            <html>
-                <body>
-                    <p>Click the link to reset your password:</p>
-                    <a href="{reset_url}">{reset_url}</a>
-                </body>
-            </html>
-            """
+            html = render_to_string('password/reset_password_email.html', {'reset_url': reset_url})
 
             msg = EmailMultiAlternatives(subject, text, from_email, to)
             msg.attach_alternative(html, "text/html")
             msg.send()
 
-            return JsonResponse({'message': 'Password reset link has been sent to your email.'}, status=200)
+            return JsonResponse({'message': 'Password reset link has been sent to your email. Check your spam'}, status=200)
 
         except Exception as e:
             return JsonResponse({'error': str(e)}, status=500)
@@ -599,11 +552,34 @@ def confirm_password_reset(request):
             user.password = password1
             user.save()
 
-            return HttpResponse("Password has been successfully reset.")
+            return render(request, 'password/password_reset_success.html')
+
         except Exception as e:
             return JsonResponse({'error': str(e)}, status=500)
     return JsonResponse({'error': 'Invalid request method'}, status=405)
 
+@api_view(['POST'])
+def send_pin(request):
+    user_id = request.data.get('user_id')
+    pin = request.data.get('pin')
+
+    if not user_id or not pin:
+        return Response({'error': 'user_id и pin обязательны'}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        user = Users.objects.get(id=user_id)
+        send_mail(
+            'Your PIN code',
+            f'Your PIN code: {pin}',
+            None,  # Использует DEFAULT_FROM_EMAIL из настроек
+            [user.email],
+            fail_silently=False
+        )
+        return Response({'message': 'Your PIN code has been sent to your email.'}, status=status.HTTP_200_OK)
+    except Users.DoesNotExist:
+        return Response({'error': 'Пользователь не найден'}, status=status.HTTP_404_NOT_FOUND)
+    except Exception as e:
+        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 @csrf_exempt
 def add_balance(request):
     if request.method == 'POST':
@@ -614,9 +590,6 @@ def add_balance(request):
 
             if not user_id or amount is None:
                 return JsonResponse({'error': 'Both user_id and amount fields are required.'}, status=400)
-
-            if amount <= 0:
-                return JsonResponse({'error': 'Amount must be greater than 0.'}, status=400)
 
             user = get_object_or_404(Users, id=user_id)
             user.balance += amount
@@ -655,7 +628,7 @@ def add_user(request):
 
             send_email(user,password,email)
 
-            return JsonResponse({'message': 'Confirmation email sent. Please verify to complete registration.'})
+            return JsonResponse({'message': 'Confirmation email sent.\nPlease verify to complete registration.\nCheck your spam.'})
 
         except Exception as e:
             return JsonResponse({'error': str(e)}, status=500)
@@ -727,12 +700,14 @@ def get_user_inventory(request):
 
             inventory_data = [
                 {
+                    'currency_code': item.currency.code,
+                    'currency_id': item.currency.id,
                     'currency': item.currency.name,
                     'quantity': item.quantity
                 }
                 for item in inventory
             ]
-            return JsonResponse({'inventory': inventory_data}, status=200)
+            return JsonResponse({'user_balance':user.balance,'inventory': inventory_data}, status=200)
 
         except json.JSONDecodeError:
             return JsonResponse({'error': 'Invalid JSON input.'}, status=400)

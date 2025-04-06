@@ -41,6 +41,7 @@ urlpatterns = [
     path('reset_user_data/', views.reset_user_data, name='reset_user_data'),
 
     # Auth
+    path('send_pin/', views.send_pin, name='send_pin'),
     path('verify_email/', views.verify_email, name='verify_email'),
     path('request_password_reset/', views.request_password_reset, name='request_password_reset'),
     path('confirm_password_reset/', views.confirm_password_reset, name='confirm_password_reset'),

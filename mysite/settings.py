@@ -33,7 +33,7 @@ EMAIL_PORT = 587
 EMAIL_USE_TLS = True
 EMAIL_HOST_USER = 'send9711@gmail.com'
 EMAIL_HOST_PASSWORD = 'jfzj xssh covg wnvh'
-DEFAULT_FROM_EMAIL = 'My App <send9711@gmail.com>'
+DEFAULT_FROM_EMAIL = 'ADAY <send9711@gmail.com>'
 SERVER_EMAIL = 'send9711@gmail.com'
 
 
@@ -66,7 +66,7 @@ ROOT_URLCONF = 'mysite.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [BASE_DIR / 'templates'],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [

@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+  <body style="margin:0; padding:0; font-family:Arial, sans-serif; background:#f4f6f8;">
+    <table align="center" cellpadding="0" cellspacing="0" width="100%" style="max-width:600px; margin:auto;">
+      <tr>
+        <td style="background-color:#ffffff; padding:40px; border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,0.1);">
+          <h2 style="color:#2e86de; text-align:center;">👋 Hello {{ user }}</h2>
+          <p style="font-size:16px; color:#333333;">
+            Thank you for registering at <strong>ADAY</strong>!
+          </p>
+          <p style="font-size:16px; color:#333333;">
+            Please click the button below to verify your email address:
+          </p>
+          <div style="text-align:center; margin:30px 0;">
+            <a href="{{ verify_url }}" style="
+              background-color:#2e86de;
+              color:#ffffff;
+              padding:14px 28px;
+              text-decoration:none;
+              border-radius:6px;
+              font-size:16px;
+              display:inline-block;
+              transition: background-color 0.3s;
+            ">Verify Email</a>
+          </div>
+          <p style="font-size:14px; color:#888888;">
+            If you didn’t request this, just ignore this message.
+          </p>
+          <p style="font-size:14px; color:#888888; margin-top:30px;">
+            Best regards,<br><strong>The ADAY Team</strong>
+          </p>
+        </td>
+      </tr>
+      <tr>
+        <td style="text-align:center; padding:20px; font-size:12px; color:#999999;">
+          © 2025 ADAY. All rights reserved.
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>

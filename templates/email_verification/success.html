@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Welcome!</title>
+    <style>
+        body {
+            background: #f0f4f8;
+            font-family: 'Segoe UI', sans-serif;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+        }
+        .box {
+            background: white;
+            padding: 40px 60px;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        h1 {
+            color: #2e86de;
+        }
+        p {
+            font-size: 18px;
+            color: #333;
+        }
+        .btn {
+            margin-top: 20px;
+            display: inline-block;
+            padding: 10px 20px;
+            background: #2e86de;
+            color: white;
+            border-radius: 6px;
+            text-decoration: none;
+            transition: background 0.3s;
+        }
+        .btn:hover {
+            background: #1b4f72;
+        }
+    </style>
+</head>
+<body>
+    <div class="box">
+        <h1>🎉 Registration Successful!</h1>
+        <p>Welcome, <strong>{{ username }}</strong>! Your email has been verified.</p>
+    </div>
+</body>
+</html>
