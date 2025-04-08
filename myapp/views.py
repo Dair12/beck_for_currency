@@ -20,6 +20,24 @@ from rest_framework import status
 pending_users = {}
 reset_tokens = {}
 
+@csrf_exempt
+def clear_transactions(user_id):
+    try:
+        if not user_id:
+            return JsonResponse({"error": "user_id field is required."}, status=400)
+
+        user = Users.objects.filter(id=user_id).first()
+        if not user:
+            return JsonResponse({"error": "User not found"}, status=404)
+
+        # Удаляем все транзакции пользователя
+        Transaction.objects.filter(user=user).delete()
+        reset_user_data_by_id(user_id)
+        return JsonResponse({"message": f"All transactions for user ID {user_id} have been deleted."}, status=200)
+
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=500)
+
 def reset_user_data_by_id(user_id):
     try:
         user = get_object_or_404(Users, id=user_id)
@@ -727,6 +745,7 @@ def reset_user_data(request):
                 return JsonResponse({'error': 'user_id field is required.'}, status=400)
 
             reset_user_data_by_id(user_id)
+            clear_transactions(user_id)
 
             return JsonResponse({'message': 'User balance and inventory reset successfully.'}, status=200)
 
